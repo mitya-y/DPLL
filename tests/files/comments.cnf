@@ -1,0 +1,7 @@
+c my best file
+p cnf 3 2
+c after p comment
+1 2 -3 0
+c comment inside
+-2 3 0
+c end comment

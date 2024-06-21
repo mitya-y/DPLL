@@ -1,0 +1,9 @@
+cmake_minimum_required(VERSION 3.20)
+
+enable_testing()
+add_subdirectory(googletest)
+target_sources(${CMAKE_PROJECT_NAME} PRIVATE test_loading.cpp test_algorithm.cpp)
+
+target_link_libraries(${CMAKE_PROJECT_NAME} gtest_main gmock_main)
+
+execute_process(COMMAND "")
