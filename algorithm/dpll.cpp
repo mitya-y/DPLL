@@ -14,6 +14,11 @@ struct Variable {
   std::vector<std::pair<uint, bool>> occurance;
 };
 
+struct ChangedVariable {
+  uint index;
+  bool restore = false;
+};
+
 static void set_satisfied_flag(const std::vector<Variable> &variables, Conjunction &con)
 {
   con.satisfied = std::any_of(con.disjunctions.begin(), con.disjunctions.end(), [&variables](const auto &v) {
@@ -22,11 +27,13 @@ static void set_satisfied_flag(const std::vector<Variable> &variables, Conjuncti
 }
 
 static bool unit_propagation(DimacsFormat &sat, std::vector<Variable> &variables, std::set<uint> &positive,
-                             std::set<uint> &negative, std::set<uint> &all)
+                             std::set<uint> &negative, std::set<uint> &all,
+                             std::vector<ChangedVariable> &changed_variables)
 {
   uint cnt = 0;
   bool changed = false;
-  // for (auto [i, con] : std::views::enumerate(sat.conjunctions)) {
+  uint index = 0;
+  // for (auto [index, con] : std::views::enumerate(sat.conjunctions)) {
   for (auto con : sat.conjunctions) {
     if (con.number_of_free_elements == 1 && !con.satisfied) {
       cnt++;
@@ -36,6 +43,7 @@ static bool unit_propagation(DimacsFormat &sat, std::vector<Variable> &variables
       Variable &var = variables[index_iter->second];
       var.used = true;
       var.value = index_iter->first;
+      changed_variables.push_back(ChangedVariable{index_iter->second, true});
 
       con.satisfied = true;
 
@@ -99,11 +107,27 @@ static bool check_success(const DimacsFormat &sat)
   return std::all_of(sat.conjunctions.begin(), sat.conjunctions.end(), [](const auto &con) { return con.satisfied; });
 }
 
-static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat sat, std::vector<Variable> variables,
-                                                           std::set<uint> positive, std::set<uint> negative,
-                                                           std::set<uint> all)
+static void restore_variable(DimacsFormat &sat, std::vector<Variable> &variables, std::set<uint> &positive,
+                             std::set<uint> &negative, std::set<uint> &all, ChangedVariable &var)
 {
-  while (unit_propagation(sat, variables, positive, negative, all)) {
+  bool is_positive = variables[var.index].value;
+  (is_positive ? positive : negative).erase(var.index);
+  variables[var.index].used = false;
+  if (var.restore) {
+    all.insert(var.index);
+  }
+  for (auto &&[con, _] : variables[var.index].occurance) {
+    sat.conjunctions[con].number_of_free_elements++;
+    set_satisfied_flag(variables, sat.conjunctions[con]);
+  }
+}
+
+static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat &sat, std::vector<Variable> &variables,
+                                                           std::set<uint> &positive, std::set<uint> &negative,
+                                                           std::set<uint> &all,
+                                                           std::vector<ChangedVariable> &changed_variables)
+{
+  while (unit_propagation(sat, variables, positive, negative, all, changed_variables)) {
   }
 
   if (!check_satisfaing(sat, variables)) {
@@ -114,7 +138,11 @@ static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat sat, std
     return variables;
   }
 
-  int var = *all.begin();
+  if (all.empty()) {
+    return std::nullopt;
+  }
+
+  uint var = *all.begin();
   all.erase(all.begin());
 
   for (uint i = 0; i < 2; i++) {
@@ -125,24 +153,25 @@ static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat sat, std
     auto &variable = variables[var];
     variable.used = true;
     variable.value = is_positive;
+    changed_variables.push_back(ChangedVariable{var, false});
     for (auto &&[con, _] : variable.occurance) {
       sat.conjunctions[con].number_of_free_elements--;
       set_satisfied_flag(variables, sat.conjunctions[con]);
     }
 
     // TODO : dont copy, make instuctions for backup (set of chaned variables)
-    auto result = recursive_dpll(sat, variables, positive, negative, all);
+    auto result = recursive_dpll(sat, variables, positive, negative, all, changed_variables);
     if (result) {
       return result.value();
     }
 
     // restore value for next iteration
-    (is_positive ? positive : negative).erase(var);
-    variable.used = false;
-    for (auto &&[con, _] : variable.occurance) {
-      sat.conjunctions[con].number_of_free_elements++;
-      set_satisfied_flag(variables, sat.conjunctions[con]);
+    while (changed_variables.back().index != var) {
+      restore_variable(sat, variables, positive, negative, all, changed_variables.back());
+      changed_variables.pop_back();
     }
+    restore_variable(sat, variables, positive, negative, all, changed_variables.back());
+    changed_variables.pop_back();
   }
 
   return std::nullopt;
@@ -226,7 +255,8 @@ std::optional<DPLLResult> dpll_algorithm(const DimacsFormat &sat)
     return std::nullopt;
   }
 
-  auto result = recursive_dpll(sat_copy, variables, positive, negative, all);
+  std::vector<ChangedVariable> changed_variables;
+  auto result = recursive_dpll(sat_copy, variables, positive, negative, all, changed_variables);
   if (!result) {
     return std::nullopt;
   }
