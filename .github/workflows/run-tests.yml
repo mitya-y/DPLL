@@ -39,12 +39,6 @@ jobs:
         cd ${{ github.workspace }}
         git clone https://github.com/mitya-y/dpll-test-repo .
 
-    - name: Download Googletests
-      run: |
-        cd tests
-        bash ./install_gtests.sh
-        cd ..
-
     - name: Configure CMake
       run: |
         mkdir build
@@ -60,7 +54,6 @@ jobs:
     - name: Run tests
       run: |
         cd build
-        cp -r ../tests/files .
         ./dpll
         cd ..
 
@@ -80,7 +73,7 @@ jobs:
 
     - name: clang-tidy test
       run: |
-        cd algorithm 
+        cd algorithm
         clang-tidy * -extra-arg=-std=gnu++2b -p="../build"
         cd ..
         cd tests
