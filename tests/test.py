@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 from pysat.formula import CNF
 
@@ -38,14 +39,19 @@ def test_sat_solver(dataset_directory, satisfy):
         print("-" * 40)
 
 if __name__ == "__main__":
+    files = "files"
+    if len(sys.argv) >= 2:
+        SOLVER = sys.argv[1]
+    if len(sys.argv) >= 3:
+        files = sys.argv[2]
     test_on_not_existing_file()
-    test_cnf_sat("files/example.cnf")
+    test_cnf_sat(f"{files}/example.cnf")
 
-    test_sat_solver("files/light/sat", True)
-    test_sat_solver("files/light/unsat", False)
+    test_sat_solver(f"{files}/light/sat", True)
+    test_sat_solver(f"{files}/light/unsat", False)
 
-    test_sat_solver("files/heavy/aim/sat", True)
-    test_sat_solver("files/heavy/aim/unsat", False)
+    test_sat_solver(f"{files}/heavy/aim/sat", True)
+    test_sat_solver(f"{files}/heavy/aim/unsat", False)
 
-    test_sat_solver("files/heavy/jnh/sat", True)
-    test_sat_solver("files/heavy/jnh/unsat", False)
+    test_sat_solver(f"{files}/heavy/jnh/sat", True)
+    test_sat_solver(f"{files}/heavy/jnh/unsat", False)
