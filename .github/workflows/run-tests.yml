@@ -61,7 +61,9 @@ jobs:
 
     - name: Run tests
       run: |
+        cd build
         make test
+        cd ..
 
     - name: clang-format test
       run: |
