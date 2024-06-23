@@ -32,6 +32,7 @@ jobs:
       run: |
         cd ${{ github.workspace }}
         git clone https://github.com/mitya-y/dpll-test-repo .
+        git switch ${{ github.head_ref || github.ref_name }}
 
     - name: Setup test utilities
       run: |
@@ -59,7 +60,6 @@ jobs:
       run: |
         cd tests
         cp ../build/dpll .
-        ls
         python3 test.py
         cd ..
 
