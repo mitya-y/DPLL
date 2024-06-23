@@ -3,8 +3,6 @@
 
 #include "algorithm/dpll.hpp"
 
-#include "tests/googletest/googletest/include/gtest/gtest.h"
-
 int main(int argc, char **argv)
 {
   if (argc <= 1) {
@@ -20,16 +18,13 @@ int main(int argc, char **argv)
   auto answer = dpll_algorithm(cnf.value());
 
   if (!answer) {
-    std::cout << "Not satisfaible\n";
+    std::cout << "NOT SATISFIABLE\n";
   }
   else {
-    std::cout << "Satisfaible\n";
+    std::cout << "SATISFIABLE\n";
     for (auto [variable, value] : answer.value()) {
       std::cout << (value ? "" : "-") << variable << ' ';
     }
     std::cout << "\n";
   }
-
-  // ::testing::InitGoogleTest(&argc, argv);
-  // return RUN_ALL_TESTS();
 }
