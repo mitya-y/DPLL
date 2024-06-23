@@ -5,6 +5,7 @@
 #include <ranges>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 
 struct Variable {
   unsigned int original_number;
@@ -26,14 +27,13 @@ static void set_satisfied_flag(const std::vector<Variable> &variables, Clause &c
   });
 }
 
-static bool unit_propagation(CNF &cnf, std::vector<Variable> &variables, std::set<unsigned int> &positive,
-                             std::set<unsigned int> &negative, std::set<unsigned int> &all,
+static bool unit_propagation(CNF &cnf, std::vector<Variable> &variables, std::unordered_set<unsigned int> &all,
                              std::vector<ChangedVariable> &changed_variables)
 {
   unsigned int cnt = 0;
   bool changed = false;
   unsigned int index = 0;
-  for (auto clause : cnf.clauses) {
+  for (auto &clause : cnf.clauses) {
     if (clause.number_of_free_variables == 1 && !clause.satisfied) {
       cnt++;
       auto &dis = clause.variables;
@@ -46,7 +46,6 @@ static bool unit_propagation(CNF &cnf, std::vector<Variable> &variables, std::se
 
       clause.satisfied = true;
 
-      (var.value ? positive : negative).insert(index_iter->second);
       all.erase(index_iter->second);
 
       for (auto &[cl, _] : var.occurrence) {
@@ -60,8 +59,7 @@ static bool unit_propagation(CNF &cnf, std::vector<Variable> &variables, std::se
   return changed;
 }
 
-static void pure_variable_elimination(CNF &cnf, std::vector<Variable> &variables, std::set<unsigned int> &positive,
-                                      std::set<unsigned int> &negative, std::set<unsigned int> &all)
+static void pure_variable_elimination(CNF &cnf, std::vector<Variable> &variables, std::unordered_set<unsigned int> &all)
 {
   unsigned int index = 0;
   for (auto variable : variables) {
@@ -74,7 +72,6 @@ static void pure_variable_elimination(CNF &cnf, std::vector<Variable> &variables
       variable.used = true;
 
       all.erase(index);
-      (all_positive ? positive : negative).insert(index);
 
       for (auto &&[clause, _] : occur) {
         cnf.clauses[clause].number_of_free_variables--;
@@ -103,11 +100,10 @@ static bool check_success(const CNF &cnf)
   return std::all_of(cnf.clauses.begin(), cnf.clauses.end(), [](const auto &clause) { return clause.satisfied; });
 }
 
-static void restore_variable(CNF &cnf, std::vector<Variable> &variables, std::set<unsigned int> &positive,
-                             std::set<unsigned int> &negative, std::set<unsigned int> &all, ChangedVariable &var)
+static void restore_variable(CNF &cnf, std::vector<Variable> &variables, std::unordered_set<unsigned int> &all,
+                             ChangedVariable &var)
 {
   bool is_positive = variables[var.index].value;
-  (is_positive ? positive : negative).erase(var.index);
   variables[var.index].used = false;
   if (var.restore) {
     all.insert(var.index);
@@ -119,12 +115,10 @@ static void restore_variable(CNF &cnf, std::vector<Variable> &variables, std::se
 }
 
 static std::optional<std::vector<Variable>> recursive_dpll(CNF &cnf, std::vector<Variable> &variables,
-                                                           std::set<unsigned int> &positive,
-                                                           std::set<unsigned int> &negative,
-                                                           std::set<unsigned int> &all,
+                                                           std::unordered_set<unsigned int> &all,
                                                            std::vector<ChangedVariable> &changed_variables)
 {
-  while (unit_propagation(cnf, variables, positive, negative, all, changed_variables)) {
+  while (unit_propagation(cnf, variables, all, changed_variables)) {
   }
 
   if (!check_sat(cnf, variables)) {
@@ -146,7 +140,6 @@ static std::optional<std::vector<Variable>> recursive_dpll(CNF &cnf, std::vector
     bool is_positive = i == 0;
 
     // change variable
-    (is_positive ? positive : negative).insert(var);
     auto &variable = variables[var];
     variable.used = true;
     variable.value = is_positive;
@@ -156,17 +149,17 @@ static std::optional<std::vector<Variable>> recursive_dpll(CNF &cnf, std::vector
       set_satisfied_flag(variables, cnf.clauses[clause]);
     }
 
-    auto result = recursive_dpll(cnf, variables, positive, negative, all, changed_variables);
+    auto result = recursive_dpll(cnf, variables, all, changed_variables);
     if (result) {
       return result.value();
     }
 
     // restore value for next iteration
     while (changed_variables.back().index != var) {
-      restore_variable(cnf, variables, positive, negative, all, changed_variables.back());
+      restore_variable(cnf, variables, all, changed_variables.back());
       changed_variables.pop_back();
     }
-    restore_variable(cnf, variables, positive, negative, all, changed_variables.back());
+    restore_variable(cnf, variables, all, changed_variables.back());
     changed_variables.pop_back();
   }
 
@@ -209,18 +202,18 @@ std::optional<DPLLResult> dpll_algorithm(const CNF &cnf)
     index++;
   }
 
-  std::set<unsigned int> positive, negative, all;
+  std::unordered_set<unsigned int> all;
   for (unsigned int i = 0; i < n; i++) {
     all.insert(i);
   }
 
-  pure_variable_elimination(cnf_copy, variables, positive, negative, all);
+  pure_variable_elimination(cnf_copy, variables, all);
   if (!check_sat(cnf_copy, variables)) {
     return std::nullopt;
   }
 
   std::vector<ChangedVariable> changed_variables;
-  auto result = recursive_dpll(cnf_copy, variables, positive, negative, all, changed_variables);
+  auto result = recursive_dpll(cnf_copy, variables, all, changed_variables);
   if (!result) {
     return std::nullopt;
   }
