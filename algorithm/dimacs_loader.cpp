@@ -38,28 +38,8 @@ std::optional<CNF> load_cnf(std::string_view filename)
     return std::nullopt;
   }
 
-  // parse and check p string
-  std::istringstream stream(line);
-  std::string p, cnf;
-  stream >> p >> cnf;
-  if (p != "p" || cnf != "cnf") {
-    return std::nullopt;
-  }
-
-  // auto vec = std::ranges::istream_view<int>(stream) | std::ranges::to<std::vector>();
-  std::vector<int> vec;
-  auto readed_range = std::ranges::istream_view<int>(stream);
-  // std::ranges::copy(readed_range, std::back_inserter(vec));
-  for (auto &&i : readed_range) {
-    vec.push_back(i);
-  }
-
-  if (vec.size() != 2) {
-    return std::nullopt;
-  }
-  unsigned int variables_number = vec[0];
-  unsigned int clauses_number = vec[1];
-  if (variables_number < 0 || clauses_number < 0) {
+  unsigned int variables_number, clauses_number;
+  if (sscanf(line.data(), "p cnf %d %d", &variables_number, &clauses_number) != 2) {
     return std::nullopt;
   }
 
@@ -77,29 +57,20 @@ std::optional<CNF> load_cnf(std::string_view filename)
 
     std::istringstream stream(line);
     Clause clause;
-
-    // conjunction.disjunctions =
-    //   std::ranges::istream_view<int>(stream) | std::views::take_while([](int var) { return var != 0; }) |
-    //   std::views::transform([&variables](int var) { return variables.insert(std::abs(var)), var; }) |
-    //   std::views::transform([](int var) { return std::make_pair<bool, unsigned int>(var >= 0, std::abs(var)); }) |
-    //   std::ranges::to<std::vector>();
-
-    auto readed_range =
-      std::ranges::istream_view<int>(stream) | std::views::take_while([](int var) { return var != 0; }) |
-      std::views::transform([&variables](int var) { return variables.insert(std::abs(var)), var; }) |
-      std::views::transform([](int var) { return std::make_pair<bool, unsigned int>(var >= 0, std::abs(var)); });
-    // std::ranges::copy(readed_range, std::back_inserter(conjunction.disjunctions));
-    for (auto &&pair : readed_range) {
-      clause.variables.push_back(pair);
+    int var;
+    while (true) {
+      stream >> var;
+      if (var == 0) {
+        break;
+      }
+      variables.insert(std::abs(var));
+      clause.variables.push_back({var >= 0, std::abs(var)});
     }
 
     clause.number_of_free_variables = clause.variables.size();
     clauses.push_back(std::move(clause));
   }
 
-  if (variables.size() > variables_number || clauses.size() != clauses_number) {
-    return std::nullopt;
-  }
   return CNF{
       std::vector(variables.begin(), variables.end()),
       std::move(clauses),

@@ -123,7 +123,8 @@ static void restore_variable(CNF &cnf, std::vector<Variable> &variables, std::se
 }
 
 static std::optional<std::vector<Variable>> recursive_dpll(CNF &cnf, std::vector<Variable> &variables,
-                                                           std::set<unsigned int> &positive, std::set<unsigned int> &negative,
+                                                           std::set<unsigned int> &positive,
+                                                           std::set<unsigned int> &negative,
                                                            std::set<unsigned int> &all,
                                                            std::vector<ChangedVariable> &changed_variables)
 {
@@ -207,40 +208,10 @@ std::optional<DPLLResult> dpll_algorithm(const CNF &cnf)
   }
 
   // calculate occurance of each variable
-  // handled variant if in one conjucion variable occur twice and more
-  // for (const auto [index, clause] : std::views::enumerate(formula)) {
   unsigned int index = 0;
-  for (auto clause : formula) {
-    std::unordered_map<unsigned int, std::pair<unsigned int, unsigned int>> counts;
-    for (auto &&[positive, v] : clause.variables) {
-      if (!counts.contains(v)) {
-        // counts[v] = {0, 0};
-        counts.insert(std::pair{v, std::pair{0, 0}});
-      }
-      // (positive ? counts[v].first : counts[v].second)++;
-      (positive ? counts.find(v)->second.first : counts.find(v)->second.second)++;
-    }
-
-    for (auto &&[v, pair] : counts) {
-      auto [poscnt, negcnt] = pair;
-      if (poscnt + negcnt == 1) {
-        variables[v].occurence.push_back(std::pair{index, poscnt != 0});
-      }
-      else {
-        auto &dis = clause.variables;
-        dis.erase(std::remove_if(dis.begin(), dis.end(), [v](auto &pair) { return pair.second == v; }), dis.end());
-
-        if (poscnt == 0 || negcnt == 0) {
-          dis.push_back({poscnt != 0, v});
-          variables[v].occurence.push_back({index, poscnt != 0});
-        }
-
-        clause.number_of_free_variables = dis.size();
-
-        if (clause.number_of_free_variables == 0) {
-          clause.satisfied = true;
-        }
-      }
+  for (auto &clause : formula) {
+    for (auto &&[value, v] : clause.variables) {
+      variables[v].occurence.push_back(std::pair{index, value});
     }
     index++;
   }
@@ -260,12 +231,10 @@ std::optional<DPLLResult> dpll_algorithm(const CNF &cnf)
   if (!result) {
     return std::nullopt;
   }
+
   std::map<unsigned int, bool> answer;
-  // TODO : reverse mappimg
   for (const auto var : result.value()) {
-    // answer[var.index] = var.value; // todo:
     answer.insert(std::pair{var.original_number, var.value});
   }
-
   return answer;
 }
