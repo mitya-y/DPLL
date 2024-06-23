@@ -11,7 +11,7 @@ files = [
 
 exit_code = 0
 for file in files:
-    os.system(f'clang-tidy {file} -extra-arg=-std=c++23 -p="build" > res.txt')
+    os.system(f'clang-tidy {file} -extra-arg=-std=gnu++2b -p="build" > res.txt')
     if os.stat("res.txt").st_size != 0:
         print(f"file {file} dont satisfy clang-format")
         exit_code = 47
