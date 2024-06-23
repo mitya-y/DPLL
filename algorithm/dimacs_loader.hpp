@@ -5,18 +5,18 @@
 #include <string_view>
 #include <vector>
 
-struct Conjunction {
-  std::vector<std::pair<bool, uint>> disjunctions;
-  uint number_of_free_elements = 0;
+struct Clause {
+  std::vector<std::pair<bool, unsigned int>> variables;
+  unsigned int number_of_free_variables = 0;
   bool satisfied = false;
-  bool operator==(const Conjunction &other) const;
+  bool operator==(const Clause &other) const;
 };
 
-struct DimacsFormat {
-  std::vector<uint> variables;
-  std::vector<Conjunction> conjunctions;
-  bool operator==(const DimacsFormat &other) const;
+struct CNF {
+  std::vector<unsigned int> variables;
+  std::vector<Clause> clauses;
+  bool operator==(const CNF &other) const;
 };
 
-std::optional<DimacsFormat> load_cnf(std::string_view filename);
-void print_dimacs_format(const DimacsFormat &dimacs);
+std::optional<CNF> load_cnf(const std::string_view filename);
+void print_dimacs_format(const CNF &dimacs);

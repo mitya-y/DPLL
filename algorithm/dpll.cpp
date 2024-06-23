@@ -7,37 +7,37 @@
 #include <unordered_map>
 
 struct Variable {
-  uint index;
+  unsigned int original_number;
   bool value = false;
   bool used = false;
   // indexes of conjustions in which this variable occur and is positive in this
-  std::vector<std::pair<uint, bool>> occurance;
+  std::vector<std::pair<unsigned int, bool>> occurence;
 };
 
 struct ChangedVariable {
-  uint index;
+  unsigned int index;
   bool restore = false;
 };
 
-static void set_satisfied_flag(const std::vector<Variable> &variables, Conjunction &con)
+static void set_satisfied_flag(const std::vector<Variable> &variables, Clause &clause)
 {
-  con.satisfied = std::any_of(con.disjunctions.begin(), con.disjunctions.end(), [&variables](const auto &v) {
+  clause.satisfied = std::any_of(clause.variables.begin(), clause.variables.end(), [&variables](const auto &v) {
     return (!(v.first ^ variables[v.second].value)) && variables[v.second].used;
   });
 }
 
-static bool unit_propagation(DimacsFormat &sat, std::vector<Variable> &variables, std::set<uint> &positive,
-                             std::set<uint> &negative, std::set<uint> &all,
+static bool unit_propagation(CNF &cnf, std::vector<Variable> &variables, std::set<unsigned int> &positive,
+                             std::set<unsigned int> &negative, std::set<unsigned int> &all,
                              std::vector<ChangedVariable> &changed_variables)
 {
-  uint cnt = 0;
+  unsigned int cnt = 0;
   bool changed = false;
-  uint index = 0;
-  // for (auto [index, con] : std::views::enumerate(sat.conjunctions)) {
-  for (auto con : sat.conjunctions) {
-    if (con.number_of_free_elements == 1 && !con.satisfied) {
+  unsigned int index = 0;
+  // for (auto [index, clause] : std::views::enumerate(sat.conjunctions)) {
+  for (auto clause : cnf.clauses) {
+    if (clause.number_of_free_variables == 1 && !clause.satisfied) {
       cnt++;
-      auto &dis = con.disjunctions;
+      auto &dis = clause.variables;
       auto index_iter = std::find_if(dis.begin(), dis.end(), [&](auto &pair) { return !variables[pair.second].used; });
 
       Variable &var = variables[index_iter->second];
@@ -45,14 +45,14 @@ static bool unit_propagation(DimacsFormat &sat, std::vector<Variable> &variables
       var.value = index_iter->first;
       changed_variables.push_back(ChangedVariable{index_iter->second, true});
 
-      con.satisfied = true;
+      clause.satisfied = true;
 
       (var.value ? positive : negative).insert(index_iter->second);
       all.erase(index_iter->second);
 
-      for (auto &[con, _] : var.occurance) {
-        sat.conjunctions[con].number_of_free_elements--;
-        set_satisfied_flag(variables, sat.conjunctions[con]);
+      for (auto &[cl, _] : var.occurence) {
+        cnf.clauses[cl].number_of_free_variables--;
+        set_satisfied_flag(variables, cnf.clauses[cl]);
       }
 
       changed = true;
@@ -61,13 +61,13 @@ static bool unit_propagation(DimacsFormat &sat, std::vector<Variable> &variables
   return changed;
 }
 
-static void pure_variable_elimination(DimacsFormat &sat, std::vector<Variable> &variables, std::set<uint> &positive,
-                                      std::set<uint> &negative, std::set<uint> &all)
+static void pure_variable_elimination(CNF &cnf, std::vector<Variable> &variables, std::set<unsigned int> &positive,
+                                      std::set<unsigned int> &negative, std::set<unsigned int> &all)
 {
   // for (const auto [index, variable] : std::views::enumerate(variables)) {
-  uint index = 0;
+  unsigned int index = 0;
   for (auto variable : variables) {
-    auto &occur = variable.occurance;
+    auto &occur = variable.occurence;
     bool all_positive = std::all_of(occur.begin(), occur.end(), [](auto &pair) { return pair.second; });
     bool all_negative = std::all_of(occur.begin(), occur.end(), [](auto &pair) { return !pair.second; });
 
@@ -78,21 +78,21 @@ static void pure_variable_elimination(DimacsFormat &sat, std::vector<Variable> &
       all.erase(index);
       (all_positive ? positive : negative).insert(index);
 
-      for (auto &&[con, _] : occur) {
-        sat.conjunctions[con].number_of_free_elements--;
-        set_satisfied_flag(variables, sat.conjunctions[con]);
+      for (auto &&[clause, _] : occur) {
+        cnf.clauses[clause].number_of_free_variables--;
+        set_satisfied_flag(variables, cnf.clauses[clause]);
       }
     }
     index++;
   }
 }
 
-static bool check_satisfaing(const DimacsFormat &sat, const std::vector<Variable> &variables)
+static bool check_satisfaing(const CNF &cnf, const std::vector<Variable> &variables)
 {
-  for (auto &con : sat.conjunctions) {
-    // if (con.satisfied)
+  for (auto &clause : cnf.clauses) {
+    // if (clause.satisfied)
     //   continue;
-    bool value = std::all_of(con.disjunctions.begin(), con.disjunctions.end(), [&variables](const auto &v) {
+    bool value = std::all_of(clause.variables.begin(), clause.variables.end(), [&variables](const auto &v) {
       return (v.first ^ variables[v.second].value) && variables[v.second].used;
     });
     if (value) {
@@ -102,13 +102,13 @@ static bool check_satisfaing(const DimacsFormat &sat, const std::vector<Variable
   return true;
 }
 
-static bool check_success(const DimacsFormat &sat)
+static bool check_success(const CNF &cnf)
 {
-  return std::all_of(sat.conjunctions.begin(), sat.conjunctions.end(), [](const auto &con) { return con.satisfied; });
+  return std::all_of(cnf.clauses.begin(), cnf.clauses.end(), [](const auto &clause) { return clause.satisfied; });
 }
 
-static void restore_variable(DimacsFormat &sat, std::vector<Variable> &variables, std::set<uint> &positive,
-                             std::set<uint> &negative, std::set<uint> &all, ChangedVariable &var)
+static void restore_variable(CNF &cnf, std::vector<Variable> &variables, std::set<unsigned int> &positive,
+                             std::set<unsigned int> &negative, std::set<unsigned int> &all, ChangedVariable &var)
 {
   bool is_positive = variables[var.index].value;
   (is_positive ? positive : negative).erase(var.index);
@@ -116,25 +116,25 @@ static void restore_variable(DimacsFormat &sat, std::vector<Variable> &variables
   if (var.restore) {
     all.insert(var.index);
   }
-  for (auto &&[con, _] : variables[var.index].occurance) {
-    sat.conjunctions[con].number_of_free_elements++;
-    set_satisfied_flag(variables, sat.conjunctions[con]);
+  for (auto &&[clause, _] : variables[var.index].occurence) {
+    cnf.clauses[clause].number_of_free_variables++;
+    set_satisfied_flag(variables, cnf.clauses[clause]);
   }
 }
 
-static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat &sat, std::vector<Variable> &variables,
-                                                           std::set<uint> &positive, std::set<uint> &negative,
-                                                           std::set<uint> &all,
+static std::optional<std::vector<Variable>> recursive_dpll(CNF &cnf, std::vector<Variable> &variables,
+                                                           std::set<unsigned int> &positive, std::set<unsigned int> &negative,
+                                                           std::set<unsigned int> &all,
                                                            std::vector<ChangedVariable> &changed_variables)
 {
-  while (unit_propagation(sat, variables, positive, negative, all, changed_variables)) {
+  while (unit_propagation(cnf, variables, positive, negative, all, changed_variables)) {
   }
 
-  if (!check_satisfaing(sat, variables)) {
+  if (!check_satisfaing(cnf, variables)) {
     return std::nullopt;
   }
 
-  if (check_success(sat)) {
+  if (check_success(cnf)) {
     return variables;
   }
 
@@ -142,10 +142,10 @@ static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat &sat, st
     return std::nullopt;
   }
 
-  uint var = *all.begin();
+  unsigned int var = *all.begin();
   all.erase(all.begin());
 
-  for (uint i = 0; i < 2; i++) {
+  for (unsigned int i = 0; i < 2; i++) {
     bool is_positive = i == 0;
 
     // change variable
@@ -154,53 +154,53 @@ static std::optional<std::vector<Variable>> recursive_dpll(DimacsFormat &sat, st
     variable.used = true;
     variable.value = is_positive;
     changed_variables.push_back(ChangedVariable{var, false});
-    for (auto &&[con, _] : variable.occurance) {
-      sat.conjunctions[con].number_of_free_elements--;
-      set_satisfied_flag(variables, sat.conjunctions[con]);
+    for (auto &&[clause, _] : variable.occurence) {
+      cnf.clauses[clause].number_of_free_variables--;
+      set_satisfied_flag(variables, cnf.clauses[clause]);
     }
 
     // TODO : dont copy, make instuctions for backup (set of chaned variables)
-    auto result = recursive_dpll(sat, variables, positive, negative, all, changed_variables);
+    auto result = recursive_dpll(cnf, variables, positive, negative, all, changed_variables);
     if (result) {
       return result.value();
     }
 
     // restore value for next iteration
     while (changed_variables.back().index != var) {
-      restore_variable(sat, variables, positive, negative, all, changed_variables.back());
+      restore_variable(cnf, variables, positive, negative, all, changed_variables.back());
       changed_variables.pop_back();
     }
-    restore_variable(sat, variables, positive, negative, all, changed_variables.back());
+    restore_variable(cnf, variables, positive, negative, all, changed_variables.back());
     changed_variables.pop_back();
   }
 
   return std::nullopt;
 }
 
-std::optional<DPLLResult> dpll_algorithm(const DimacsFormat &sat)
+std::optional<DPLLResult> dpll_algorithm(const CNF &cnf)
 {
   // array of variables
-  size_t n = sat.variables.size();
-  auto iter = sat.variables.begin();
+  size_t n = cnf.variables.size();
+  auto iter = cnf.variables.begin();
   std::vector<Variable> variables(n);
-  for (uint i = 0; i < n; i++) {
-    variables[i].index = *(iter++);
+  for (unsigned int i = 0; i < n; i++) {
+    variables[i].original_number = *(iter++);
   }
 
   // mapping from all natural numbers to [0; N) for indexing in array
-  std::unordered_map<uint, uint> variables_map;
-  uint id = 0;
-  for (uint v : sat.variables) {
+  std::unordered_map<unsigned int, unsigned int> variables_map;
+  unsigned int id = 0;
+  for (unsigned int v : cnf.variables) {
     if (!variables_map.contains(v)) {
       // variables_map[v] = id++;
       variables_map.insert(std::pair{v, id++});
     }
   }
 
-  auto sat_copy = sat;
-  auto &formula = sat_copy.conjunctions;
-  for (auto &con : formula) {
-    for (auto &[_, v] : con.disjunctions) {
+  auto cnf_copy = cnf;
+  auto &formula = cnf_copy.clauses;
+  for (auto &clause : formula) {
+    for (auto &[_, v] : clause.variables) {
       // v = variables_map[v];
       v = variables_map.find(v)->second;
     }
@@ -208,11 +208,11 @@ std::optional<DPLLResult> dpll_algorithm(const DimacsFormat &sat)
 
   // calculate occurance of each variable
   // handled variant if in one conjucion variable occur twice and more
-  // for (const auto [index, con] : std::views::enumerate(formula)) {
-  uint index = 0;
-  for (auto con : formula) {
-    std::unordered_map<uint, std::pair<uint, uint>> counts;
-    for (auto &&[positive, v] : con.disjunctions) {
+  // for (const auto [index, clause] : std::views::enumerate(formula)) {
+  unsigned int index = 0;
+  for (auto clause : formula) {
+    std::unordered_map<unsigned int, std::pair<unsigned int, unsigned int>> counts;
+    for (auto &&[positive, v] : clause.variables) {
       if (!counts.contains(v)) {
         // counts[v] = {0, 0};
         counts.insert(std::pair{v, std::pair{0, 0}});
@@ -224,47 +224,47 @@ std::optional<DPLLResult> dpll_algorithm(const DimacsFormat &sat)
     for (auto &&[v, pair] : counts) {
       auto [poscnt, negcnt] = pair;
       if (poscnt + negcnt == 1) {
-        variables[v].occurance.push_back(std::pair{index, poscnt != 0});
+        variables[v].occurence.push_back(std::pair{index, poscnt != 0});
       }
       else {
-        auto &dis = con.disjunctions;
+        auto &dis = clause.variables;
         dis.erase(std::remove_if(dis.begin(), dis.end(), [v](auto &pair) { return pair.second == v; }), dis.end());
 
         if (poscnt == 0 || negcnt == 0) {
           dis.push_back({poscnt != 0, v});
-          variables[v].occurance.push_back({index, poscnt != 0});
+          variables[v].occurence.push_back({index, poscnt != 0});
         }
 
-        con.number_of_free_elements = dis.size();
+        clause.number_of_free_variables = dis.size();
 
-        if (con.number_of_free_elements == 0) {
-          con.satisfied = true;
+        if (clause.number_of_free_variables == 0) {
+          clause.satisfied = true;
         }
       }
     }
     index++;
   }
 
-  std::set<uint> positive, negative, all;
-  for (uint i = 0; i < n; i++) {
+  std::set<unsigned int> positive, negative, all;
+  for (unsigned int i = 0; i < n; i++) {
     all.insert(i);
   }
 
-  pure_variable_elimination(sat_copy, variables, positive, negative, all);
-  if (!check_satisfaing(sat_copy, variables)) {
+  pure_variable_elimination(cnf_copy, variables, positive, negative, all);
+  if (!check_satisfaing(cnf_copy, variables)) {
     return std::nullopt;
   }
 
   std::vector<ChangedVariable> changed_variables;
-  auto result = recursive_dpll(sat_copy, variables, positive, negative, all, changed_variables);
+  auto result = recursive_dpll(cnf_copy, variables, positive, negative, all, changed_variables);
   if (!result) {
     return std::nullopt;
   }
-  std::map<uint, bool> answer;
+  std::map<unsigned int, bool> answer;
   // TODO : reverse mappimg
   for (const auto var : result.value()) {
     // answer[var.index] = var.value; // todo:
-    answer.insert(std::pair{var.index, var.value});
+    answer.insert(std::pair{var.original_number, var.value});
   }
 
   return answer;

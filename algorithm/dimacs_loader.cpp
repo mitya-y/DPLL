@@ -18,7 +18,7 @@ static std::string strip(const std::string &s)
   return s.substr(start, size);
 }
 
-std::optional<DimacsFormat> load_cnf(std::string_view filename)
+std::optional<CNF> load_cnf(std::string_view filename)
 {
   std::ifstream file(filename.data());
   if (!file) {
@@ -57,15 +57,15 @@ std::optional<DimacsFormat> load_cnf(std::string_view filename)
   if (vec.size() != 2) {
     return std::nullopt;
   }
-  uint variables_number = vec[0];
-  uint conjunctions_number = vec[1];
-  if (variables_number < 0 || conjunctions_number < 0) {
+  unsigned int variables_number = vec[0];
+  unsigned int clauses_number = vec[1];
+  if (variables_number < 0 || clauses_number < 0) {
     return std::nullopt;
   }
 
-  std::set<uint> variables;
-  std::vector<Conjunction> conjunctions;
-  uint i = 0;
+  std::set<unsigned int> variables;
+  std::vector<Clause> clauses;
+  unsigned int i = 0;
   while (std::getline(file, line)) {
     line = strip(line);
     if (line.size() == 0 || line[0] == 'c') {
@@ -76,45 +76,45 @@ std::optional<DimacsFormat> load_cnf(std::string_view filename)
     }
 
     std::istringstream stream(line);
-    Conjunction conjunction;
+    Clause clause;
 
     // conjunction.disjunctions =
     //   std::ranges::istream_view<int>(stream) | std::views::take_while([](int var) { return var != 0; }) |
     //   std::views::transform([&variables](int var) { return variables.insert(std::abs(var)), var; }) |
-    //   std::views::transform([](int var) { return std::make_pair<bool, uint>(var >= 0, std::abs(var)); }) |
+    //   std::views::transform([](int var) { return std::make_pair<bool, unsigned int>(var >= 0, std::abs(var)); }) |
     //   std::ranges::to<std::vector>();
 
     auto readed_range =
-        std::ranges::istream_view<int>(stream) | std::views::take_while([](int var) { return var != 0; }) |
-        std::views::transform([&variables](int var) { return variables.insert(std::abs(var)), var; }) |
-        std::views::transform([](int var) { return std::make_pair<bool, uint>(var >= 0, std::abs(var)); });
+      std::ranges::istream_view<int>(stream) | std::views::take_while([](int var) { return var != 0; }) |
+      std::views::transform([&variables](int var) { return variables.insert(std::abs(var)), var; }) |
+      std::views::transform([](int var) { return std::make_pair<bool, unsigned int>(var >= 0, std::abs(var)); });
     // std::ranges::copy(readed_range, std::back_inserter(conjunction.disjunctions));
     for (auto &&pair : readed_range) {
-      conjunction.disjunctions.push_back(pair);
+      clause.variables.push_back(pair);
     }
 
-    conjunction.number_of_free_elements = conjunction.disjunctions.size();
-    conjunctions.push_back(std::move(conjunction));
+    clause.number_of_free_variables = clause.variables.size();
+    clauses.push_back(std::move(clause));
   }
 
-  if (variables.size() > variables_number || conjunctions.size() != conjunctions_number) {
+  if (variables.size() > variables_number || clauses.size() != clauses_number) {
     return std::nullopt;
   }
-  return DimacsFormat{
+  return CNF{
       std::vector(variables.begin(), variables.end()),
-      std::move(conjunctions),
+      std::move(clauses),
   };
 }
 
-void print_dimacs_format(const DimacsFormat &dimacs)
+void print_dimacs_format(const CNF &dimacs)
 {
   std::cout << "variables: ";
   for (int v : dimacs.variables) {
     std::cout << v << " ";
   }
   std::cout << "\n";
-  for (auto &dis : dimacs.conjunctions) {
-    for (auto &&[pos, v] : dis.disjunctions) {
+  for (auto &dis : dimacs.clauses) {
+    for (auto &&[pos, v] : dis.variables) {
       std::cout << (pos ? "" : "!") << v << " ";
     }
     std::cout << "\n";
@@ -122,13 +122,13 @@ void print_dimacs_format(const DimacsFormat &dimacs)
   std::cout << "\n";
 }
 
-bool Conjunction::operator==(const Conjunction &other) const
+bool Clause::operator==(const Clause &other) const
 {
-  return other.disjunctions == disjunctions && other.number_of_free_elements == number_of_free_elements &&
+  return other.variables == variables && other.number_of_free_variables == number_of_free_variables &&
          other.satisfied == satisfied;
 }
 
-bool DimacsFormat::operator==(const DimacsFormat &other) const
+bool CNF::operator==(const CNF &other) const
 {
-  return other.variables == variables && other.conjunctions == conjunctions;
+  return other.variables == variables && other.clauses == clauses;
 }
