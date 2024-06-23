@@ -92,14 +92,3 @@ void print_dimacs_format(const CNF &dimacs)
   }
   std::cout << "\n";
 }
-
-bool Clause::operator==(const Clause &other) const
-{
-  return other.variables == variables && other.number_of_free_variables == number_of_free_variables &&
-         other.satisfied == satisfied;
-}
-
-bool CNF::operator==(const CNF &other) const
-{
-  return other.variables == variables && other.clauses == clauses;
-}
