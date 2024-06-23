@@ -39,6 +39,16 @@ jobs:
         cd ${{ github.workspace }}
         git clone https://github.com/mitya-y/dpll-test-repo .
 
+    - name: Setup test utilities
+      run: |
+        sudo apt update && sudo apt install python3
+        python3 -m pip install python-sat
+        sudo apt install clang-format
+        sudo apt install clang-tidy
+        sudo apt install bear
+        bear -- cmake --build build
+        mv compile_commands.json build
+
     - name: Configure CMake
       run: |
         mkdir build
@@ -54,18 +64,10 @@ jobs:
 
     - name: Run tests
       run: |
-        cd build
-        ./dpll
+        cd tests
+        cp ../build/dpll .
+        python3 tester.py
         cd ..
-
-    - name: Setup format checks
-      run: |
-        sudo apt update && sudo apt install python3
-        sudo apt install clang-format
-        sudo apt install clang-tidy
-        sudo apt install bear
-        bear -- cmake --build build
-        mv compile_commands.json build
 
     - name: clang-format test
       run: |
