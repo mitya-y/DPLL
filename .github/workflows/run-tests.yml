@@ -31,7 +31,7 @@ jobs:
     - name: Download sourse code
       run: |
         cd ${{ github.workspace }}
-        git clone https://github.com/mitya-y/dpll-test-repo .
+        git clone https://github.com/mitya-y/DPLL .
         git switch -c ${{ github.head_ref || github.ref_name }}
         git fetch
         git branch --set-upstream-to=origin/${{ github.head_ref || github.ref_name }}
