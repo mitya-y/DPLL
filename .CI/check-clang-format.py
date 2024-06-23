@@ -6,6 +6,8 @@ files = [
     "algorithm/dpll.hpp",
     "algorithm/dimacs_loader.cpp",
     "algorithm/dimacs_loader.hpp",
+
+    "main.cpp"
 ]
 
 exit_code = 0

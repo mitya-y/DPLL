@@ -68,15 +68,11 @@ jobs:
 
     - name: clang-format test
       run: |
-        cp .github/workflows/check-clang-format.py .
+        cp .CI/check-clang-format.py .
         python3 check-clang-format.py
 
     - name: clang-tidy test
       run: |
-        cd algorithm
-        clang-tidy * -extra-arg=-std=gnu++2b -p="../build"
-        cd ..
-        cd tests
-        clang-tidy *.cpp -extra-arg=-std=gnu++2b -p="../build"
-        cd ..
+        cp .CI/check-clang-format.py .
+        python3 check-clang-format.py
 
