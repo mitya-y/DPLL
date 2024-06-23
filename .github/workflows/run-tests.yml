@@ -73,6 +73,6 @@ jobs:
 
     - name: clang-tidy test
       run: |
-        cp .CI/check-clang-format.py .
-        python3 check-clang-format.py
+        cp .CI/check-clang-tidy.py .
+        python3 check-clang-tidy.py
 
