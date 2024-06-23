@@ -61,10 +61,7 @@ jobs:
 
     - name: Run tests
       run: |
-        cd tests
-        cp ../build/dpll .
-        python3 test.py
-        cd ..
+        make test
 
     - name: clang-format test
       run: |
