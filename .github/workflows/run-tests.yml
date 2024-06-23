@@ -59,7 +59,7 @@ jobs:
       run: |
         cd tests
         cp ../build/dpll .
-        python3 tester.py
+        python3 test.py
         cd ..
 
     - name: clang-format test
