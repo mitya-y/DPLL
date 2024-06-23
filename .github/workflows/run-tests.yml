@@ -59,6 +59,7 @@ jobs:
       run: |
         cd tests
         cp ../build/dpll .
+        ls
         python3 test.py
         cd ..
 
