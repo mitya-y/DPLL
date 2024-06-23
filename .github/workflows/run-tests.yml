@@ -28,12 +28,6 @@ jobs:
             build_type: Release
 
     steps:
-    - name: Set reusable strings
-      id: strings
-      shell: bash
-      run: |
-        echo "build-output-dir=${{ github.workspace }}/build" >> "$GITHUB_OUTPUT"
-
     - name: Download sourse code
       run: |
         cd ${{ github.workspace }}
@@ -46,8 +40,6 @@ jobs:
         sudo apt install clang-format
         sudo apt install clang-tidy
         sudo apt install bear
-        bear -- cmake --build build
-        mv compile_commands.json build
 
     - name: Configure CMake
       run: |
@@ -58,9 +50,10 @@ jobs:
               -DCMAKE_C_COMPILER=${{ matrix.c_compiler }} \
               -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} ..
 
-    - name: Build
+    - name: Build and generate compile_commands
       run: |
-        cmake --build ${{ steps.strings.outputs.build-output-dir }} --config ${{ matrix.build_type }}
+        bear -- cmake --build build
+        mv compile_commands.json build
 
     - name: Run tests
       run: |
