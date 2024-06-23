@@ -32,10 +32,10 @@ jobs:
       run: |
         cd ${{ github.workspace }}
         git clone https://github.com/mitya-y/DPLL .
-        git switch -c ${{ github.head_ref || github.ref_name }}
-        git fetch
-        git branch --set-upstream-to=origin/${{ github.head_ref || github.ref_name }}
-        git pull
+        # git switch -c ${{ github.head_ref || github.ref_name }}
+        # git fetch
+        # git branch --set-upstream-to=origin/${{ github.head_ref || github.ref_name }}
+        # git pull
 
     - name: Setup test utilities
       run: |
