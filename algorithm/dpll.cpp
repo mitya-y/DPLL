@@ -59,19 +59,27 @@ static bool unit_propagation(CNF &cnf, std::vector<Variable> &variables, std::un
   return changed;
 }
 
-static void pure_variable_elimination(CNF &cnf, std::vector<Variable> &variables, std::unordered_set<unsigned int> &all)
+static bool pure_literal_elimination(CNF &cnf, std::vector<Variable> &variables, std::unordered_set<unsigned int> &all,
+                                     std::vector<ChangedVariable> &changed_variables)
 {
   unsigned int index = 0;
-  for (auto variable : variables) {
+  bool changed = false;
+  for (auto &variable : variables) {
+    if (variable.used) {
+      continue;
+    }
+
     auto &occur = variable.occurrence;
     bool all_positive = std::all_of(occur.begin(), occur.end(), [](auto &pair) { return pair.second; });
     bool all_negative = std::all_of(occur.begin(), occur.end(), [](auto &pair) { return !pair.second; });
 
     if (all_positive || all_negative) {
+      changed = true;
       variable.value = all_positive;
       variable.used = true;
 
       all.erase(index);
+      changed_variables.push_back(ChangedVariable{index, true});
 
       for (auto &&[clause, _] : occur) {
         cnf.clauses[clause].number_of_free_variables--;
@@ -80,9 +88,10 @@ static void pure_variable_elimination(CNF &cnf, std::vector<Variable> &variables
     }
     index++;
   }
+  return changed;
 }
 
-static bool check_sat(const CNF &cnf, const std::vector<Variable> &variables)
+static bool check_unsat(const CNF &cnf, const std::vector<Variable> &variables)
 {
   for (auto &clause : cnf.clauses) {
     bool value = std::all_of(clause.variables.begin(), clause.variables.end(), [&variables](const auto &v) {
@@ -120,8 +129,10 @@ static std::optional<std::vector<Variable>> recursive_dpll(CNF &cnf, std::vector
 {
   while (unit_propagation(cnf, variables, all, changed_variables)) {
   }
+  while (pure_literal_elimination(cnf, variables, all, changed_variables)) {
+  }
 
-  if (!check_sat(cnf, variables)) {
+  if (!check_unsat(cnf, variables)) {
     return std::nullopt;
   }
 
@@ -207,10 +218,10 @@ std::optional<DPLLResult> dpll_algorithm(const CNF &cnf)
     all.insert(i);
   }
 
-  pure_variable_elimination(cnf_copy, variables, all);
-  if (!check_sat(cnf_copy, variables)) {
-    return std::nullopt;
-  }
+  // pure_literal_elimination(cnf_copy, variables, all);
+  // if (!check_unsat(cnf_copy, variables)) {
+  //   return std::nullopt;
+  // }
 
   std::vector<ChangedVariable> changed_variables;
   auto result = recursive_dpll(cnf_copy, variables, all, changed_variables);
